@@ -43,15 +43,21 @@ def main():
     users_data = aapi.user_bookmarks_illust(USER_ID, restrict='public')
     bookmarks = users_data['illusts']
 
+    print('')
+    while True:
+        try:
+            next_url = users_data['next_url']
+            next_qs = aapi.parse_qs(next_url)
+            # users_dataに30以降のjsonデータを再代入
+            users_data = aapi.user_bookmarks_illust(**next_qs)
+            bookmarks.append(users_data['illusts'])
+            #sleep(1)
+        except KeyError:
+            break
+    print(f'[INFO] Found {len(bookmarks)} artworks.')
     # ダウンロード
     for bookmark in bookmarks:
         download_image(bookmark)
-
-    next_url = users_data['next_url']
-    next_qs = aapi.parse_qs(next_url)
-    # users_dataに30以降のjsonデータを再代入
-    users_data = aapi.user_bookmarks_illust(**next_qs)
-    print(next_qs)
 
 def is_manga(work_info):
     if work_info["page_count"] > 1:
