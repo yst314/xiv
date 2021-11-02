@@ -3,6 +3,7 @@ import argparse
 from time import sleep
 import json
 import os
+from tqdm import tqdm
 
 class PixivToken:
     access_token = ''
@@ -29,6 +30,7 @@ def main():
     # 引数
     parser = argparse.ArgumentParser(description='USER_ID')
     parser.add_argument('--userid', '-u', help='ユーザーID', type=str, default='')
+    parser.add_argument('-s', action='store_true', help='skip searching bookmarks')
     args = parser.parse_args()
     USER_ID = args.userid
 
@@ -39,24 +41,28 @@ def main():
     aapi.auth(refresh_token=token.refresh_token)
     print('Connection successed')
 
-    # ブックマークした画像のjsonを取得
-    users_data = aapi.user_bookmarks_illust(USER_ID, restrict='public')
-    bookmarks = users_data['illusts']
+    if not args.s:
+        # ブックマークした画像のjsonを取得
+        users_data = aapi.user_bookmarks_illust(USER_ID, restrict='public')
+        bookmarks = users_data['illusts']
+        print('[INFO] Getting information on all bookmarks')
+        while True:
+            try:
+                next_url = users_data['next_url']
+                next_qs = aapi.parse_qs(next_url)
+                users_data = aapi.user_bookmarks_illust(**next_qs)
+                bookmarks += users_data['illusts']
+            except KeyError:
+                break
+    else:
+        with open('bookmarks.json', 'r') as file:
+            bookmarks = json.load(file)
 
-    print('')
-    while True:
-        try:
-            next_url = users_data['next_url']
-            next_qs = aapi.parse_qs(next_url)
-            # users_dataに30以降のjsonデータを再代入
-            users_data = aapi.user_bookmarks_illust(**next_qs)
-            bookmarks.append(users_data['illusts'])
-            #sleep(1)
-        except KeyError:
-            break
+    with open('bookmarks.json', mode='wt', encoding='utf-8') as file:
+        json.dump(bookmarks, file, ensure_ascii=False, indent=2)
     print(f'[INFO] Found {len(bookmarks)} artworks.')
     # ダウンロード
-    for bookmark in bookmarks:
+    for bookmark in tqdm(bookmarks):
         download_image(bookmark)
 
 def is_manga(work_info):
